@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Remix</title>
+  <script src="https://unpkg.com/wavesurfer.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f4f4f4;
+    }
+    img {
+      width: 100%;
+      border-radius: 12px;
+    }
+    #waveform {
+      margin-top: 20px;
+    }
+    .controls {
+      margin-top: 10px;
+    }
+    button, textarea {
+      padding: 8px;
+      margin-top: 10px;
+    }
+    #download {
+      margin-top: 20px;
+      display: inline-block;
+      padding: 10px;
+      background: #333;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+    #counter {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #222;
+    }
+    #comment-box {
+      margin-top: 30px;
+    }
+    #comment-list {
+      margin-top: 10px;
+      background: white;
+      padding: 10px;
+      border: 1px solid #ccc;
+    }
+    .comment {
+      border-bottom: 1px solid #ddd;
+      padding: 5px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Cover Art -->
+  <img src="https://docs.google.com/uc?export=download&id=1IPUt3VwmISCzqs_rEkJS81NfaPvBMTSY" alt="Cover Art">
+
+  <!-- Waveform -->
+  <div id="waveform"></div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button onclick="wavesurfer.playPause()">Play / Pause</button>
+  </div>
+
+  <!-- Download -->
+  <a id="download" href="https://docs.google.com/uc?export=download&id=1SeoUe5fO0FeeEnYLLbex5tq5ne-i0gLE" download>Download Remix</a>
+
+  <!-- Stream Counter -->
+  <div id="counter">Streams: <span id="stream-count">Loading...</span></div>
+
+  <!-- Comment Section -->
+  <div id="comment-box">
+    <h3>Leave a Comment</h3>
+    <textarea id="comment-input" rows="3" style="width:100%;" placeholder="Type your comment..."></textarea><br>
+    <button onclick="submitComment()">Submit</button>
+
+    <div id="comment-list">
+      <h4>Comments</h4>
+      <div id="comments-container">Loading...</div>
+    </div>
+  </div>
+
+  <script>
+    const STREAM_BIN_ID = '686092fa8561e97a502dc2e5';
+    const COMMENT_BIN_ID = '68609bac8a456b7966b79f16'; // <-- Replace this!
+    const API_KEY = '$2a$10$3ELWAGinv9GJ2HVDKKZrYOB3PSp0kEzRgNsBA6xo5KYyCBRfgssqe';
+
+    // Initialize WaveSurfer
+    const wavesurfer = WaveSurfer.create({
+      container: '#waveform',
+      waveColor: '#999',
+      progressColor: '#333',
+      height: 80
+    });
+    wavesurfer.load("https://docs.google.com/uc?export=download&id=1SeoUe5fO0FeeEnYLLbex5tq5ne-i0gLE");
+
+    // Stream Counter
+    wavesurfer.on('play', () => {
+      fetch(`https://api.jsonbin.io/v3/b/${STREAM_BIN_ID}/latest`, {
+        headers: { 'X-Master-Key': API_KEY }
+      })
+      .then(res => res.json())
+      .then(data => {
+        const count = (data.record.streams || 0) + 1;
+        document.getElementById("stream-count").textContent = count;
+        return fetch(`https://api.jsonbin.io/v3/b/${STREAM_BIN_ID}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": API_KEY
+          },
+          body: JSON.stringify({ streams: count })
+        });
+      });
+    });
+
+    // Load Stream Count
+    fetch(`https://api.jsonbin.io/v3/b/${STREAM_BIN_ID}/latest`, {
+      headers: { 'X-Master-Key': API_KEY }
+    })
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById("stream-count").textContent = data.record.streams || 0;
+    });
+
+    // Comment Functions
+    function loadComments() {
+      fetch(`https://api.jsonbin.io/v3/b/${COMMENT_BIN_ID}/latest`, {
+        headers: { 'X-Master-Key': API_KEY }
+      })
+      .then(res => res.json())
+      .then(data => {
+        const comments = data.record.comments || [];
+        const container = document.getElementById("comments-container");
+        container.innerHTML = "";
+        comments.forEach(comment => {
+          const div = document.createElement("div");
+          div.className = "comment";
+          div.textContent = comment;
+          container.appendChild(div);
+        });
+      });
+    }
+
+    function submitComment() {
+      const input = document.getElementById("comment-input");
+      const comment = input.value.trim();
+      if (!comment) return;
+
+      fetch(`https://api.jsonbin.io/v3/b/${COMMENT_BIN_ID}/latest`, {
+        headers: { 'X-Master-Key': API_KEY }
+      })
+      .then(res => res.json())
+      .then(data => {
+        const comments = data.record.comments || [];
+        comments.push(comment);
+        return fetch(`https://api.jsonbin.io/v3/b/${COMMENT_BIN_ID}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": API_KEY
+          },
+          body: JSON.stringify({ comments })
+        });
+      })
+      .then(() => {
+        document.getElementById("comment-input").value = "";
+        loadComments();
+      });
+    }
+
+    loadComments();
+  </script>
+</body>
+</html>
